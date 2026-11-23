@@ -1,0 +1,36 @@
+name: Compilar APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['**']
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generar estructura Android
+        run: |
+          flutter create --org ar.consorciofield --project-name consorcio_field --platforms=android _scaffold
+          cp -r _scaffold/android ./android
+          rm -rf _scaffold
+      - name: Ajustar Android (permisos, minSdk 29, nombre)
+        run: dart tools/preparar_android.dart
+      - run: flutter pub get
+      - name: Generar íconos
+        run: dart run flutter_launcher_icons
+      - name: Compilar APK
+        run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ConsorcioField-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
