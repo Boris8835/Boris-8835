@@ -48,5 +48,51 @@ void main() {
     f.writeAsStringSync(g);
     stdout.writeln('Actualizado $ruta (minSdk 29)');
   }
-  stdout.writeln('Android listo: permisos + minSdk 29 + nombre de la app.');
+  // Evita que R8 (minificador) falle por clases opcionales de ML Kit.
+  for (final ruta in ['android/app/build.gradle.kts', 'android/app/build.gradle']) {
+    final f = File(ruta);
+    if (!f.existsSync()) continue;
+    var g = f.readAsStringSync();
+    if (g.contains('CF_NOMINIFY')) continue;
+    final kts = ruta.endsWith('.kts');
+    final re = RegExp(r'signingConfig\s*=?\s*signingConfigs\.(getByName\("debug"\)|debug)');
+    final extra = kts
+        ? '\n            isMinifyEnabled = false // CF_NOMINIFY\n            isShrinkResources = false'
+        : '\n            minifyEnabled false // CF_NOMINIFY\n            shrinkResources false';
+    g = g.replaceFirstMapped(re, (m) => '${m.group(0)}$extra');
+    f.writeAsStringSync(g);
+  }
+
+  // Fuerza compileSdk 36 en TODOS los módulos (plugins que compilan con 34/35).
+  for (final ruta in ['android/build.gradle.kts', 'android/build.gradle']) {
+    final f = File(ruta);
+    if (!f.existsSync()) continue;
+    var g = f.readAsStringSync();
+    if (g.contains('CF_COMPILESDK')) continue;
+    final kts = ruta.endsWith('.kts');
+    final bloque = kts
+        ? '''// CF_COMPILESDK
+subprojects {
+    afterEvaluate {
+        val ext = extensions.findByName("android")
+        if (ext is com.android.build.gradle.BaseExtension) {
+            ext.compileSdkVersion(36)
+        }
+    }
+}
+
+'''
+        : '''// CF_COMPILESDK
+subprojects {
+    afterEvaluate { p ->
+        if (p.hasProperty('android')) {
+            p.android.compileSdkVersion 36
+        }
+    }
+}
+
+''';
+    f.writeAsStringSync(bloque + g);
+  }
+  stdout.writeln('Android listo: permisos + minSdk 29 + nombre + compileSdk 36.');
 }
