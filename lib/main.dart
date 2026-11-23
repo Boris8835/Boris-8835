@@ -8,6 +8,7 @@ import 'screens/inspecciones.dart';
 import 'screens/liquidacion.dart';
 import 'screens/ordenes.dart';
 import 'screens/plantillas.dart';
+import 'screens/propietarios.dart';
 import 'screens/reclamos.dart';
 import 'widgets.dart';
 
@@ -74,6 +75,7 @@ class Inicio extends StatelessWidget {
   Widget build(BuildContext context) {
     final modulos = <_Modulo>[
       _Modulo('Consorcios y unidades', Icons.apartment, kAzul, () => const ConsorciosScreen()),
+      _Modulo('Propietarios', Icons.people, const Color(0xFF455A64), () => const PropietariosScreen()),
       _Modulo('Inspecciones', Icons.fact_check, const Color(0xFF1565C0), () => const InspeccionesScreen()),
       _Modulo('Órdenes de trabajo', Icons.build, const Color(0xFF6A1B9A), () => const OrdenesScreen()),
       _Modulo('Gastos', Icons.receipt_long, kVerde, () => const GastosScreen()),

@@ -407,7 +407,7 @@ class _UnidadFormState extends State<UnidadForm> {
         child: ListView(padding: const EdgeInsets.all(14), children: [
           campo(_piso, 'Piso (ej: PB, 01, 02)', obligatorio: true),
           campo(_num, 'Unidad / Depto (ej: A, 12)', obligatorio: true),
-          campo(_prop, 'Propietario / inquilino', icono: Icons.person),
+          campo(_prop, 'Propietario / inquilino (nombre y apellido)', icono: Icons.person),
           campo(_tel, 'Teléfono', tipo: TextInputType.phone, icono: Icons.phone),
           campo(_coef, 'Coeficiente de expensas (%)', tipo: const TextInputType.numberWithOptions(decimal: true)),
           campo(_saldo, 'Saldo pendiente de expensas (\$)', tipo: const TextInputType.numberWithOptions(decimal: true)),
