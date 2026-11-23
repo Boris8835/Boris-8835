@@ -32,21 +32,23 @@ jobs:
       - name: Generar íconos
         run: dart run flutter_launcher_icons
       - name: Compilar APK
-        run: flutter build apk --release
+        run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4
         with:
           name: ConsorcioField-APK
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
       - name: Publicar APK como descarga (Release)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-v${{ github.run_number }}
           name: Consorcio Field APK ${{ github.run_number }}
-          files: build/app/outputs/flutter-apk/app-release.apk
+          files: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
       - name: Guardar APK en la rama apk
         run: |
           mkdir /tmp/apk
-          cp build/app/outputs/flutter-apk/app-release.apk /tmp/apk/ConsorcioField.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk /tmp/apk/ConsorcioField.apk
           cd /tmp/apk
           git init -q
           git checkout -q -b apk
