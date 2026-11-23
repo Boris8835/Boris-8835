@@ -31,6 +31,10 @@ jobs:
       - run: flutter pub get
       - name: Generar íconos
         run: dart run flutter_launcher_icons
+      - name: Usar firma fija (permite actualizar sin desinstalar)
+        run: |
+          mkdir -p ~/.android
+          cp tools/debug.keystore ~/.android/debug.keystore
       - name: Compilar APK
         run: flutter build apk --release --split-per-abi
       - uses: actions/upload-artifact@v4

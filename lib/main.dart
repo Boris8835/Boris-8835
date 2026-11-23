@@ -5,6 +5,7 @@ import 'screens/consorcios.dart';
 import 'screens/consulta.dart';
 import 'screens/gastos.dart';
 import 'screens/inspecciones.dart';
+import 'screens/liquidacion.dart';
 import 'screens/ordenes.dart';
 import 'screens/plantillas.dart';
 import 'screens/reclamos.dart';
@@ -76,6 +77,7 @@ class Inicio extends StatelessWidget {
       _Modulo('Inspecciones', Icons.fact_check, const Color(0xFF1565C0), () => const InspeccionesScreen()),
       _Modulo('Órdenes de trabajo', Icons.build, const Color(0xFF6A1B9A), () => const OrdenesScreen()),
       _Modulo('Gastos', Icons.receipt_long, kVerde, () => const GastosScreen()),
+      _Modulo('Liquidación de expensas', Icons.calculate, const Color(0xFF283593), () => const LiquidacionScreen()),
       _Modulo('Reclamos vecinales', Icons.record_voice_over, kRojo, () => const ReclamosScreen()),
       _Modulo('Consulta rápida', Icons.search, kAmbar, () => const ConsultaScreen()),
       _Modulo('Plantillas de mensajes', Icons.chat, const Color(0xFF00796B), () => const PlantillasScreen()),
