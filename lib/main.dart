@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'compartir_app.dart';
 import 'screens/consorcios.dart';
 import 'screens/consulta.dart';
 import 'screens/gastos.dart';
@@ -91,6 +92,16 @@ class Inicio extends StatelessWidget {
           SizedBox(width: 10),
           Text('Consorcio Field'),
         ]),
+        actions: [
+          IconButton(
+              tooltip: 'Compartir la app (solo desarrollador)',
+              icon: const Icon(Icons.share),
+              onPressed: () => compartirApp(context)),
+          IconButton(
+              tooltip: 'Acerca de',
+              icon: const Icon(Icons.info_outline),
+              onPressed: () => mostrarAcercaDe(context)),
+        ],
       ),
       body: SafeArea(
         child: GridView.count(

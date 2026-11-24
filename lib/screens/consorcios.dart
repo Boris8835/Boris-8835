@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import '../db.dart';
+import '../expensas.dart';
 import '../widgets.dart';
 
 // =====================================================================
@@ -372,6 +373,67 @@ class _UnidadFormState extends State<UnidadForm> {
   late final _saldo = TextEditingController(
       text: widget.existente == null ? '0' : widget.existente!['saldo'].toString());
 
+  List<Map<String, dynamic>> _exp = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _recargarCuenta();
+  }
+
+  Future<void> _recargarCuenta() async {
+    final id = widget.existente?['id'] as int?;
+    if (id == null) return;
+    final u = await Db.one('unidades', id);
+    final e = await Expensas.deUnidad(id);
+    if (!mounted) return;
+    setState(() {
+      _exp = e;
+      if (u != null) _saldo.text = u['saldo'].toString();
+    });
+  }
+
+  List<Widget> _seccionCuenta() {
+    final saldo = parseNumero(_saldo.text) ?? 0;
+    final debe = saldo > 0.005;
+    return [
+      const SizedBox(height: 18),
+      Card(
+        color: debe ? const Color(0xFFFDECEA) : const Color(0xFFE8F5E9),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: debe ? kRojo : kVerde, width: 2.5)),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(children: [
+            Icon(debe ? Icons.warning_amber_rounded : Icons.check_circle,
+                size: 40, color: debe ? kRojo : kVerde),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(debe ? 'DEBE ${fmtPlata(saldo)}' : 'AL DÍA',
+                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: debe ? kRojo : kVerde)),
+            ),
+          ]),
+        ),
+      ),
+      const SizedBox(height: 10),
+      BotonGrande(
+          icono: Icons.picture_as_pdf,
+          texto: 'COMPARTIR ESTADO DE CUENTA (PDF)',
+          color: kVerde,
+          onPressed: () => compartirEstadoCuenta(context, widget.existente!['id'] as int)),
+      const SizedBox(height: 18),
+      const Text('Expensas de esta unidad', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+      if (_exp.isEmpty)
+        const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Text('Todavía no hay expensas emitidas. Se emiten desde "Liquidación de expensas".',
+                style: TextStyle(fontSize: 16))),
+      for (final e in _exp) TarjetaExpensa(key: ValueKey(e['id']), e: e, mostrarUnidad: false, onCambio: _recargarCuenta),
+      const SizedBox(height: 30),
+    ];
+  }
+
   Future<void> _guardar() async {
     if (!_k.currentState!.validate()) return;
     await Db.save('unidades', {
@@ -412,6 +474,7 @@ class _UnidadFormState extends State<UnidadForm> {
           campo(_coef, 'Coeficiente de expensas (%)', tipo: const TextInputType.numberWithOptions(decimal: true)),
           campo(_saldo, 'Saldo pendiente de expensas (\$)', tipo: const TextInputType.numberWithOptions(decimal: true)),
           BotonGrande(icono: Icons.save, texto: 'GUARDAR', onPressed: _guardar),
+          if (widget.existente != null) ..._seccionCuenta(),
         ]),
       ),
     );

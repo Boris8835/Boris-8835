@@ -11,6 +11,14 @@ import 'package:sqflite/sqflite.dart';
 class Db {
   static Database? _db;
 
+  static const String _tablaExpensas = '''CREATE TABLE expensas(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    consorcio_id INTEGER NOT NULL, consorcio_nombre TEXT,
+    unidad_id INTEGER, unidad_txt TEXT, propietario TEXT,
+    periodo TEXT NOT NULL, coeficiente REAL,
+    ordinarias REAL, extraordinarias REAL, total REAL,
+    estado TEXT, fecha_emision TEXT, fecha_pago TEXT, medio_pago TEXT)''';
+
   static const String _tablaLiquidaciones = '''CREATE TABLE liquidaciones(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     consorcio_id INTEGER NOT NULL, periodo TEXT NOT NULL,
@@ -21,10 +29,13 @@ class Db {
     final dir = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dir, 'consorcio_field.db'),
-      version: 2,
+      version: 3,
       onUpgrade: (db, viejo, nuevo) async {
         if (viejo < 2) {
           await db.execute(_tablaLiquidaciones);
+        }
+        if (viejo < 3) {
+          await db.execute(_tablaExpensas);
         }
       },
       onCreate: (db, v) async {
@@ -63,6 +74,7 @@ class Db {
           propietario TEXT, telefono TEXT, descripcion TEXT,
           fotos TEXT, estado TEXT, creado TEXT)''');
         await db.execute(_tablaLiquidaciones);
+        await db.execute(_tablaExpensas);
         await db.execute('''CREATE TABLE reclamo_historial(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           reclamo_id INTEGER NOT NULL, fecha TEXT, texto TEXT, foto TEXT)''');

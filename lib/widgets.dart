@@ -28,6 +28,13 @@ String fmtPlata(num? v) {
   return f.format(v ?? 0);
 }
 
+String periodoTexto(String? p) {
+  final d = DateTime.tryParse('${p ?? ''}-01');
+  if (d == null) return p ?? '-';
+  final t = DateFormat('MMMM yyyy', 'es_AR').format(d);
+  return t[0].toUpperCase() + t.substring(1);
+}
+
 double? parseNumero(String s) {
   var t = s.trim().replaceAll(r'$', '').replaceAll(' ', '');
   if (t.isEmpty) return null;

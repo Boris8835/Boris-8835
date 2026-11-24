@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../db.dart';
+import '../expensas.dart';
 import '../widgets.dart';
 import 'consorcios.dart';
 
@@ -65,7 +66,7 @@ class PropietariosScreen extends StatelessWidget {
             subtitle: Text(
                 '${u['consorcio_nombre']}\nPiso ${u['piso']} · Unidad ${u['numero']}${(u['telefono'] ?? '').toString().isEmpty ? '' : ' · Tel ${u['telefono']}'}'),
             isThreeLine: true,
-            trailing: const Icon(Icons.edit),
+            trailing: EstadoDeuda(u['saldo'] as num?),
             onTap: () async {
               await Navigator.push(
                   c,

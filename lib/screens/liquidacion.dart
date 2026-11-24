@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../db.dart';
+import '../expensas.dart';
+import '../pdf_informes.dart';
 import '../widgets.dart';
 
 // =====================================================================
-// Liquidación de expensas: suma los gastos del mes de un consorcio y los
-// reparte entre las unidades según su coeficiente.
+// Liquidación de expensas: suma los gastos del mes de un consorcio, los
+// reparte por coeficiente, EMITE las expensas (quedan en "DEBE") y permite
+// asentar cada pago ("PAGADO") y compartir el PDF por WhatsApp.
 // =====================================================================
 class LiquidacionScreen extends StatefulWidget {
   const LiquidacionScreen({super.key});
@@ -22,111 +25,131 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
   DateTime _mes = DateTime(DateTime.now().year, DateTime.now().month);
   List<Map<String, dynamic>> _gastos = [];
   List<Map<String, dynamic>> _unidades = [];
-  Map<String, dynamic>? _aplicada;
+  List<Map<String, dynamic>> _expensas = []; // emitidas
+  Map<String, dynamic>? _legacy; // emitida con la versión anterior (sin detalle)
   bool _cargando = false;
 
   String get _periodo => DateFormat('yyyy-MM').format(_mes);
-  String get _periodoTxt {
-    final t = DateFormat('MMMM yyyy', 'es_AR').format(_mes);
-    return t[0].toUpperCase() + t.substring(1);
-  }
+  String get _periodoTxt => periodoTexto(_periodo);
+  bool get _emitida => _expensas.isNotEmpty;
 
   Future<void> _cargar() async {
     if (_cid == null) return;
     setState(() => _cargando = true);
-    final todos = await Db.all('gastos', where: 'consorcio_id = ?', args: [_cid], orderBy: 'fecha ASC');
-    final delMes = todos.where((g) {
-      final d = DateTime.tryParse((g['fecha'] ?? '').toString());
-      return d != null && d.year == _mes.year && d.month == _mes.month;
-    }).toList();
-    final u = await Db.all('unidades',
-        where: 'consorcio_id = ?', args: [_cid], orderBy: 'piso, numero');
-    final liq = await Db.all('liquidaciones',
-        where: 'consorcio_id = ? AND periodo = ?', args: [_cid, _periodo]);
+    final gastos = await Expensas.gastosDelPeriodo(_cid!, _periodo);
+    final u = await Db.all('unidades', where: 'consorcio_id = ?', args: [_cid], orderBy: 'piso, numero');
+    final exp = await Expensas.delPeriodo(_cid!, _periodo);
+    final liq = await Db.all('liquidaciones', where: 'consorcio_id = ? AND periodo = ?', args: [_cid, _periodo]);
     if (!mounted) return;
     setState(() {
-      _gastos = delMes;
+      _gastos = gastos;
       _unidades = u;
-      _aplicada = liq.isEmpty ? null : liq.first;
+      _expensas = exp;
+      _legacy = (exp.isEmpty && liq.isNotEmpty) ? liq.first : null;
       _cargando = false;
     });
   }
 
   bool _esExtra(Map<String, dynamic> g) => g['tipo'] == 'Expensa extraordinaria';
   double _m(Map<String, dynamic> g) => (g['monto'] as num?)?.toDouble() ?? 0;
-  double get _totalOrd => _gastos.where((g) => !_esExtra(g)).fold(0.0, (a, g) => a + _m(g));
-  double get _totalExt => _gastos.where(_esExtra).fold(0.0, (a, g) => a + _m(g));
-  double get _sumaCoef => _unidades.fold(0.0, (a, u) => a + ((u['coeficiente'] as num?)?.toDouble() ?? 0));
+  double get _totalOrd => _emitida
+      ? _expensas.fold(0.0, (a, e) => a + ((e['ordinarias'] as num?)?.toDouble() ?? 0))
+      : _gastos.where((g) => !_esExtra(g)).fold(0.0, (a, g) => a + _m(g));
+  double get _totalExt => _emitida
+      ? _expensas.fold(0.0, (a, e) => a + ((e['extraordinarias'] as num?)?.toDouble() ?? 0))
+      : _gastos.where(_esExtra).fold(0.0, (a, g) => a + _m(g));
+  double get _sumaCoef => _unidades.fold(0.0, (a, u) => a + _coef(u));
   double _coef(Map<String, dynamic> u) => (u['coeficiente'] as num?)?.toDouble() ?? 0;
   double _ord(Map<String, dynamic> u) => double.parse((_totalOrd * _coef(u) / 100).toStringAsFixed(2));
   double _ext(Map<String, dynamic> u) => double.parse((_totalExt * _coef(u) / 100).toStringAsFixed(2));
+
+  double get _cobrado =>
+      _expensas.where((e) => e['estado'] == 'Pagado').fold(0.0, (a, e) => a + ((e['total'] as num?)?.toDouble() ?? 0));
+  double get _pendiente =>
+      _expensas.where((e) => e['estado'] != 'Pagado').fold(0.0, (a, e) => a + ((e['total'] as num?)?.toDouble() ?? 0));
 
   void _cambiarMes(int d) {
     setState(() => _mes = DateTime(_mes.year, _mes.month + d));
     _cargar();
   }
 
-  String _resumenTexto() {
-    final b = StringBuffer();
-    b.writeln('LIQUIDACIÓN DE EXPENSAS - $_cnombre');
-    b.writeln('Período: $_periodoTxt');
-    b.writeln('Gastos ordinarios: ${fmtPlata(_totalOrd)}');
-    b.writeln('Gastos extraordinarios: ${fmtPlata(_totalExt)}');
-    b.writeln('TOTAL: ${fmtPlata(_totalOrd + _totalExt)}');
-    b.writeln('');
-    for (final u in _unidades) {
-      final tot = _ord(u) + _ext(u);
-      b.writeln('Piso ${u['piso']} - ${u['numero']} (${_coef(u)}%): ${fmtPlata(tot)}'
-          '${(u['propietario'] ?? '').toString().isEmpty ? '' : ' - ${u['propietario']}'}');
-    }
-    return b.toString();
+  List<Map<String, dynamic>> _filasParaPdf() {
+    if (_emitida) return _expensas;
+    return [
+      for (final u in _unidades)
+        {
+          'unidad_txt': 'Piso ${u['piso']} - ${u['numero']}',
+          'propietario': u['propietario'] ?? '',
+          'coeficiente': _coef(u),
+          'ordinarias': _ord(u),
+          'extraordinarias': _ext(u),
+          'total': _ord(u) + _ext(u),
+        }
+    ];
   }
 
-  Future<void> _aplicar() async {
+  Future<void> _compartirPdf() async {
+    try {
+      final cons = await Db.one('consorcios', _cid!);
+      final f = await pdfLiquidacion(cons, _cnombre, _periodo, _gastos, _filasParaPdf(), _emitida);
+      await Share.shareXFiles([XFile(f.path, mimeType: 'application/pdf')],
+          text: 'Liquidación de expensas - $_cnombre - $_periodoTxt');
+    } catch (e) {
+      if (mounted) aviso(context, 'No se pudo generar el PDF: $e');
+    }
+  }
+
+  Future<void> _emitirExpensas() async {
     if (_unidades.isEmpty || _gastos.isEmpty) return;
     final ok = await confirmar(
         context,
-        'Se va a SUMAR la expensa de $_periodoTxt al saldo pendiente de cada unidad '
+        'Se emiten las expensas de $_periodoTxt: cada unidad queda en DEBE y el importe se suma a su saldo '
         '(${fmtPlata(_totalOrd + _totalExt)} en total).\n\nPodés revertirlo después.',
-        boton: 'Aplicar');
+        boton: 'Emitir');
     if (!ok) return;
-    final detalle = <String, double>{};
-    for (final u in _unidades) {
-      final monto = _ord(u) + _ext(u);
-      detalle[u['id'].toString()] = monto;
-      final nuevo = Map<String, dynamic>.from(u);
-      nuevo['saldo'] = ((u['saldo'] as num?)?.toDouble() ?? 0) + monto;
-      await Db.save('unidades', nuevo);
-    }
-    await Db.save('liquidaciones', {
-      'consorcio_id': _cid,
-      'periodo': _periodo,
-      'total': _totalOrd + _totalExt,
-      'detalle': jsonEncode(detalle),
-      'aplicada': DateTime.now().toIso8601String(),
-    });
+    await Expensas.emitir(
+      consorcioId: _cid!,
+      consorcioNombre: _cnombre,
+      periodo: _periodo,
+      unidades: _unidades,
+      totalOrd: _totalOrd,
+      totalExt: _totalExt,
+    );
     await _cargar();
-    if (mounted) aviso(context, 'Expensas sumadas a los saldos.');
+    if (mounted) aviso(context, 'Expensas emitidas. Ahora podés asentar los pagos.');
   }
 
-  Future<void> _revertir() async {
-    final liq = _aplicada;
+  Future<void> _revertirEmision() async {
+    if (!await confirmar(context,
+        'Se eliminan las expensas emitidas de $_periodoTxt (también los pagos asentados de ese mes) y se descuenta lo adeudado de cada saldo.',
+        boton: 'Revertir')) {
+      return;
+    }
+    await Expensas.revertirEmision(_cid!, _periodo);
+    await _cargar();
+    if (mounted) aviso(context, 'Emisión revertida.');
+  }
+
+  Future<void> _revertirLegacy() async {
+    final liq = _legacy;
     if (liq == null) return;
     if (!await confirmar(context, 'Se RESTA del saldo de cada unidad lo que se había sumado en $_periodoTxt.',
         boton: 'Revertir')) {
       return;
     }
-    final detalle = (jsonDecode(liq['detalle'] as String) as Map).map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
-    for (final u in _unidades) {
-      final monto = detalle[u['id'].toString()];
-      if (monto == null) continue;
-      final nuevo = Map<String, dynamic>.from(u);
-      nuevo['saldo'] = ((u['saldo'] as num?)?.toDouble() ?? 0) - monto;
-      await Db.save('unidades', nuevo);
-    }
+    try {
+      final detalle = (jsonDecode(liq['detalle'] as String) as Map)
+          .map((k, v) => MapEntry(k.toString(), (v as num).toDouble()));
+      for (final u in _unidades) {
+        final monto = detalle[u['id'].toString()];
+        if (monto == null) continue;
+        final nuevo = Map<String, dynamic>.from(u);
+        nuevo['saldo'] = ((u['saldo'] as num?)?.toDouble() ?? 0) - monto;
+        await Db.save('unidades', nuevo);
+      }
+    } catch (_) {}
     await Db.delete('liquidaciones', liq['id'] as int);
     await _cargar();
-    if (mounted) aviso(context, 'Aplicación revertida.');
   }
 
   @override
@@ -147,15 +170,16 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
           IconButton(iconSize: 40, icon: const Icon(Icons.chevron_left), onPressed: () => _cambiarMes(-1)),
           Expanded(
               child: Text(_periodoTxt,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
+                  textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900))),
           IconButton(iconSize: 40, icon: const Icon(Icons.chevron_right), onPressed: () => _cambiarMes(1)),
         ]),
         if (_cid == null)
           const Padding(
               padding: EdgeInsets.all(20),
-              child: Text('Elegí un consorcio y el mes. Se suman los gastos cargados en ese mes y se reparten por coeficiente.',
-                  textAlign: TextAlign.center, style: TextStyle(fontSize: 17))),
+              child: Text(
+                  'Elegí un consorcio y el mes. Se suman los gastos cargados en ese mes y se reparten por coeficiente.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 17))),
         if (_cargando) const LinearProgressIndicator(),
         if (_cid != null && !_cargando) ...[
           Card(
@@ -163,15 +187,40 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(children: [
-                const Text('Total a repartir', style: TextStyle(color: Colors.white, fontSize: 16)),
+                Text(_emitida ? 'Total emitido' : 'Total a repartir',
+                    style: const TextStyle(color: Colors.white, fontSize: 16)),
                 Text(fmtPlata(_totalOrd + _totalExt),
                     style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900)),
                 const SizedBox(height: 6),
                 Text('Ordinarias: ${fmtPlata(_totalOrd)}', style: const TextStyle(color: Colors.white, fontSize: 16)),
-                Text('Extraordinarias: ${fmtPlata(_totalExt)}', style: const TextStyle(color: Colors.white, fontSize: 16)),
+                Text('Extraordinarias: ${fmtPlata(_totalExt)}',
+                    style: const TextStyle(color: Colors.white, fontSize: 16)),
               ]),
             ),
           ),
+          if (_emitida)
+            Row(children: [
+              Expanded(
+                  child: Card(
+                      color: const Color(0xFFE8F5E9),
+                      child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(children: [
+                            const Text('COBRADO', style: TextStyle(fontWeight: FontWeight.w800, color: kVerde)),
+                            Text(fmtPlata(_cobrado),
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: kVerde)),
+                          ])))),
+              Expanded(
+                  child: Card(
+                      color: const Color(0xFFFDECEA),
+                      child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(children: [
+                            const Text('DEBEN', style: TextStyle(fontWeight: FontWeight.w800, color: kRojo)),
+                            Text(fmtPlata(_pendiente),
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: kRojo)),
+                          ])))),
+            ]),
           if (_unidades.isEmpty)
             const Card(
                 color: Color(0xFFFFF3CD),
@@ -179,7 +228,7 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
                     padding: EdgeInsets.all(12),
                     child: Text('Este consorcio no tiene unidades. Cargalas en "Consorcios y unidades".',
                         style: TextStyle(fontSize: 16))))
-          else if (!coefOk)
+          else if (!coefOk && !_emitida)
             Card(
                 color: const Color(0xFFFFF3CD),
                 child: Padding(
@@ -187,12 +236,12 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
                     child: Text(
                         'Atención: los coeficientes suman ${_sumaCoef.toStringAsFixed(2)}% (deberían sumar 100%). El reparto no va a cerrar con el total.',
                         style: const TextStyle(fontSize: 16)))),
-          if (_gastos.isEmpty)
+          if (_gastos.isEmpty && !_emitida)
             const Padding(
                 padding: EdgeInsets.all(20),
                 child: Text('No hay gastos cargados en este mes para este consorcio.',
-                    textAlign: TextAlign.center, style: TextStyle(fontSize: 17)))
-          else ...[
+                    textAlign: TextAlign.center, style: TextStyle(fontSize: 17))),
+          if (_gastos.isNotEmpty)
             ExpansionTile(
               title: Text('Gastos del mes (${_gastos.length})',
                   style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
@@ -205,6 +254,33 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
                   ),
               ],
             ),
+          if (_legacy != null)
+            Card(
+              color: const Color(0xFFFFF3CD),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(children: [
+                  const Text(
+                      'Esta liquidación se sumó a los saldos con la versión anterior de la app (sin detalle de pagos). Revertila y volvé a emitirla para poder marcar Pagado.',
+                      style: TextStyle(fontSize: 16)),
+                  const SizedBox(height: 8),
+                  BotonGrande(icono: Icons.undo, texto: 'REVERTIR', color: kRojo, onPressed: _revertirLegacy),
+                ]),
+              ),
+            )
+          else if (_emitida) ...[
+            const SizedBox(height: 6),
+            const Text('Expensas por unidad', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            for (final e in _expensas) TarjetaExpensa(key: ValueKey(e['id']), e: e, mostrarUnidad: true, onCambio: _cargar),
+            const SizedBox(height: 10),
+            BotonGrande(
+                icono: Icons.picture_as_pdf,
+                texto: 'COMPARTIR LIQUIDACIÓN (PDF)',
+                color: kVerde,
+                onPressed: _compartirPdf),
+            const SizedBox(height: 10),
+            BotonGrande(icono: Icons.undo, texto: 'REVERTIR EMISIÓN', color: kRojo, onPressed: _revertirEmision),
+          ] else if (_gastos.isNotEmpty && _unidades.isNotEmpty) ...[
             const SizedBox(height: 6),
             const Text('Reparto por unidad', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             for (final u in _unidades)
@@ -223,28 +299,16 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
               ),
             const SizedBox(height: 10),
             BotonGrande(
-                icono: Icons.share,
-                texto: 'COMPARTIR LIQUIDACIÓN',
-                color: kVerde,
-                onPressed: () => Share.share(_resumenTexto())),
+                icono: Icons.picture_as_pdf,
+                texto: 'VER / COMPARTIR BORRADOR (PDF)',
+                color: kAzul,
+                onPressed: _compartirPdf),
             const SizedBox(height: 10),
-            if (_aplicada == null)
-              BotonGrande(
-                  icono: Icons.add_card,
-                  texto: 'SUMAR A SALDOS DE UNIDADES',
-                  color: kNaranja.withAlpha(255),
-                  onPressed: _unidades.isEmpty ? null : _aplicar)
-            else ...[
-              Card(
-                color: const Color(0xFFE8F5E9),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Text('Ya sumada a los saldos el ${fmtFecha(_aplicada!['aplicada']?.toString(), hora: true)}.',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                ),
-              ),
-              BotonGrande(icono: Icons.undo, texto: 'REVERTIR APLICACIÓN', color: kRojo, onPressed: _revertir),
-            ],
+            BotonGrande(
+                icono: Icons.receipt_long,
+                texto: 'EMITIR EXPENSAS (quedan en DEBE)',
+                color: kNaranja.withAlpha(255),
+                onPressed: _emitirExpensas),
           ],
           const SizedBox(height: 30),
         ],
