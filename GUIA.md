@@ -71,3 +71,4 @@ Todo se guarda en el celular (`consorcio_field.db`), cada módulo en tablas sepa
 - **Ingresos** y **Informe de gastos e ingresos (PDF)** con balance, desde la pantalla principal, Gastos o Ingresos.
 - Los PDF ya no llevan el nombre del desarrollador; figura al pie de la pantalla principal.
 - **Movimiento de fondos:** cuadro mensual por consorcio (Concepto / Entrada-Debe / Salida-Haber / Saldo) con saldo inicial (resultado del mes anterior), expensas comunes cobradas, fondo de reserva (10 %), deudas y convenios (atrasadas pagadas), otros ingresos y los gastos del mes. Genera el resultado del mes y PDF.
+- **Cargar propietarios desde una foto:** en Propietarios, ícono de escáner (arriba a la derecha). Elegí el consorcio, sacá foto al listado, revisá/corregí las filas y tocá IMPORTAR. Si la unidad ya existe se actualiza; si no, se crea.

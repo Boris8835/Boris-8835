@@ -10,7 +10,7 @@ import 'widgets.dart';
 // en texto: solo su huella con sal y 60.000 repeticiones.)
 // =====================================================================
 const String kDesarrollador = 'Boris Javier Casanueva Muñoz';
-const String kVersionApp = '1.3';
+const String kVersionApp = '1.4';
 const String kLinkDescarga = 'https://github.com/Boris8835/Boris-8835/releases/latest';
 
 const String _sal = 'c6c25a4e9f3884dc';

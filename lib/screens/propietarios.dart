@@ -3,11 +3,14 @@ import '../db.dart';
 import '../expensas.dart';
 import '../widgets.dart';
 import 'consorcios.dart';
+import 'importar_propietarios.dart';
 
 // =====================================================================
 // Propietarios: lista de todas las unidades con su propietario/inquilino.
 // Tocá una para cargar o editar nombre, teléfono, coeficiente y saldo.
 // =====================================================================
+final _kLista = GlobalKey<ListaModuloState>();
+
 class PropietariosScreen extends StatelessWidget {
   const PropietariosScreen({super.key});
 
@@ -46,10 +49,22 @@ class PropietariosScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListaModulo(
+      key: _kLista,
       titulo: 'Propietarios',
       vacio: 'Todavía no hay unidades.\nPrimero cargá un consorcio y generá sus unidades en "Consorcios y unidades", o tocá NUEVO para agregar una unidad con su propietario.',
       cargar: _cargar,
       buscable: (e) => '${e['propietario']} ${e['consorcio_nombre']} ${e['piso']} ${e['numero']} ${e['telefono']}',
+      acciones: [
+        IconButton(
+          tooltip: 'Cargar propietarios desde una foto',
+          icon: const Icon(Icons.document_scanner),
+          onPressed: () async {
+            await Navigator.push(
+                context, MaterialPageRoute(builder: (_) => const ImportarPropietariosScreen()));
+            await _kLista.currentState?.recargar();
+          },
+        ),
+      ],
       onNuevo: () => _nuevo(context),
       item: (c, u, recargar) {
         final sin = (u['propietario'] ?? '').toString().trim().isEmpty;
