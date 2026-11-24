@@ -55,29 +55,25 @@ Future<File> generarActaPdf(Map<String, dynamic> insp, Map<String, dynamic>? con
     final col = _color(estado);
     cuerpo.add(pw.Container(
       margin: const pw.EdgeInsets.only(bottom: 8),
-      color: cGris,
-      child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-        pw.Container(width: 5, color: col),
-        pw.Expanded(
-          child: pw.Padding(
-            padding: const pw.EdgeInsets.all(9),
-            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-                pw.Text(limpio(it['nombre']),
-                    style: pw.TextStyle(fontSize: 11.5, fontWeight: pw.FontWeight.bold, color: cNavy)),
-                pdfChip(_txt(estado), col),
-              ]),
-              if ((it['ubicacion'] ?? '').toString().isNotEmpty) ...[
-                pw.SizedBox(height: 4),
-                pw.Text('Ubicación: ${limpio(it['ubicacion'])}', style: const pw.TextStyle(fontSize: 9.5)),
-              ],
-              if ((it['nota'] ?? '').toString().isNotEmpty) ...[
-                pw.SizedBox(height: 3),
-                pw.Text('Nota: ${limpio(it['nota'])}', style: const pw.TextStyle(fontSize: 9.5)),
-              ],
-            ]),
-          ),
-        ),
+      padding: const pw.EdgeInsets.all(9),
+      decoration: pw.BoxDecoration(
+        color: cGris,
+        border: pw.Border(left: pw.BorderSide(color: col, width: 5)),
+      ),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
+          pw.Text(limpio(it['nombre']),
+              style: pw.TextStyle(fontSize: 11.5, fontWeight: pw.FontWeight.bold, color: cNavy)),
+          pdfChip(_txt(estado), col),
+        ]),
+        if ((it['ubicacion'] ?? '').toString().isNotEmpty) ...[
+          pw.SizedBox(height: 4),
+          pw.Text('Ubicación: ${limpio(it['ubicacion'])}', style: const pw.TextStyle(fontSize: 9.5)),
+        ],
+        if ((it['nota'] ?? '').toString().isNotEmpty) ...[
+          pw.SizedBox(height: 3),
+          pw.Text('Nota: ${limpio(it['nota'])}', style: const pw.TextStyle(fontSize: 9.5)),
+        ],
       ]),
     ));
     final fotos = (it['medios'] as List? ?? [])

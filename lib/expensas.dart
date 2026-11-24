@@ -72,6 +72,33 @@ class Expensas {
     });
   }
 
+  static Future<List<Map<String, dynamic>>> pagosDeUnidad(int unidadId) =>
+      Db.all('pagos', where: 'unidad_id = ?', args: [unidadId], orderBy: 'id DESC');
+
+  /// Deuda del saldo que NO corresponde a una expensa emitida (cargada con la versión anterior o a mano).
+  static double saldoSinDetalle(Map<String, dynamic> unidad, List<Map<String, dynamic>> exp) {
+    final enFilas = exp.where((e) => e['estado'] != 'Pagado').fold(0.0, (a, e) => a + _n(e['total']));
+    final r = _n(unidad['saldo']) - enFilas;
+    return r > 0.005 ? _r2(r) : 0.0;
+  }
+
+  static Future<void> pagarSaldo(Map<String, dynamic> unidad, double monto, String medio, DateTime fecha) async {
+    await Db.save('pagos', {
+      'unidad_id': unidad['id'],
+      'consorcio_id': unidad['consorcio_id'],
+      'fecha': fecha.toIso8601String(),
+      'monto': _r2(monto),
+      'medio': medio,
+      'concepto': 'Saldo anterior',
+    });
+    await _ajustarSaldo(unidad['id'], -_r2(monto));
+  }
+
+  static Future<void> anularPago(Map<String, dynamic> pago) async {
+    await Db.delete('pagos', pago['id'] as int);
+    await _ajustarSaldo(pago['unidad_id'], _n(pago['monto']));
+  }
+
   static Future<void> _ajustarSaldo(dynamic unidadId, double delta) async {
     if (unidadId == null) return;
     final u = await Db.one('unidades', unidadId as int);
@@ -137,7 +164,8 @@ Future<void> compartirEstadoCuenta(BuildContext context, int unidadId) {
     final unidad = (await Db.one('unidades', unidadId))!;
     final cons = await Db.one('consorcios', unidad['consorcio_id'] as int);
     final exp = await Expensas.deUnidad(unidadId);
-    return pdfEstadoCuenta(unidad, cons, exp);
+    final pagos = await Expensas.pagosDeUnidad(unidadId);
+    return pdfEstadoCuenta(unidad, cons, exp, pagos);
   }, 'Estado de cuenta de expensas');
 }
 
@@ -297,4 +325,66 @@ class TarjetaExpensa extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<bool> dialogoPagoSaldo(BuildContext context, Map<String, dynamic> unidad, double maximo) async {
+  final c = TextEditingController(text: maximo.toStringAsFixed(2));
+  String medio = 'Efectivo';
+  DateTime fecha = DateTime.now();
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (d) => StatefulBuilder(
+      builder: (d, setD) => AlertDialog(
+        title: const Text('Registrar pago'),
+        content: SingleChildScrollView(
+          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Saldo anterior sin detalle: ${fmtPlata(maximo)}',
+                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: c,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              decoration: deco('Monto que paga (\$)'),
+            ),
+            const SizedBox(height: 12),
+            const Text('Forma de pago', style: TextStyle(fontSize: 15)),
+            const SizedBox(height: 6),
+            SelectorEstado(
+                opciones: const ['Efectivo', 'Transferencia', 'Cheque', 'Otro'],
+                valor: medio,
+                onChanged: (v) => setD(() => medio = v)),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
+              icon: const Icon(Icons.event),
+              label: Text('Fecha de pago: ${fmtFecha(fecha.toIso8601String())}'),
+              onPressed: () async {
+                final f = await elegirFecha(d, fecha);
+                if (f != null) setD(() => fecha = f);
+              },
+            ),
+          ]),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancelar')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: kVerde),
+            onPressed: () {
+              final m = parseNumero(c.text);
+              if (m == null || m <= 0 || m > maximo + 0.005) {
+                aviso(d, 'Monto inválido. Máximo: ${fmtPlata(maximo)}');
+                return;
+              }
+              Navigator.pop(d, true);
+            },
+            child: const Text('REGISTRAR PAGO'),
+          ),
+        ],
+      ),
+    ),
+  );
+  if (ok != true) return false;
+  await Expensas.pagarSaldo(unidad, parseNumero(c.text)!, medio, fecha);
+  return true;
 }

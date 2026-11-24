@@ -374,6 +374,8 @@ class _UnidadFormState extends State<UnidadForm> {
       text: widget.existente == null ? '0' : widget.existente!['saldo'].toString());
 
   List<Map<String, dynamic>> _exp = [];
+  List<Map<String, dynamic>> _pagos = [];
+  Map<String, dynamic>? _unidadDb;
 
   @override
   void initState() {
@@ -386,9 +388,12 @@ class _UnidadFormState extends State<UnidadForm> {
     if (id == null) return;
     final u = await Db.one('unidades', id);
     final e = await Expensas.deUnidad(id);
+    final p = await Expensas.pagosDeUnidad(id);
     if (!mounted) return;
     setState(() {
       _exp = e;
+      _pagos = p;
+      _unidadDb = u;
       if (u != null) _saldo.text = u['saldo'].toString();
     });
   }
@@ -396,6 +401,7 @@ class _UnidadFormState extends State<UnidadForm> {
   List<Widget> _seccionCuenta() {
     final saldo = parseNumero(_saldo.text) ?? 0;
     final debe = saldo > 0.005;
+    final sinDetalle = _unidadDb == null ? 0.0 : Expensas.saldoSinDetalle(_unidadDb!, _exp);
     return [
       const SizedBox(height: 18),
       Card(
@@ -416,12 +422,61 @@ class _UnidadFormState extends State<UnidadForm> {
           ]),
         ),
       ),
+      if (sinDetalle > 0.005)
+        Card(
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14), side: const BorderSide(color: kAmbar, width: 2.5)),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Saldo anterior sin detalle: ${fmtPlata(sinDetalle)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              const Text('Deuda cargada antes de emitir las expensas por mes. Registrá acá su pago.',
+                  style: TextStyle(fontSize: 15)),
+              const SizedBox(height: 10),
+              BotonGrande(
+                  icono: Icons.check_circle,
+                  texto: 'PAGADO / REGISTRAR PAGO',
+                  color: kVerde,
+                  onPressed: () async {
+                    if (_unidadDb == null) return;
+                    if (await dialogoPagoSaldo(context, _unidadDb!, sinDetalle)) await _recargarCuenta();
+                  }),
+            ]),
+          ),
+        ),
       const SizedBox(height: 10),
       BotonGrande(
           icono: Icons.picture_as_pdf,
           texto: 'COMPARTIR ESTADO DE CUENTA (PDF)',
           color: kVerde,
           onPressed: () => compartirEstadoCuenta(context, widget.existente!['id'] as int)),
+      if (_pagos.isNotEmpty) ...[
+        const SizedBox(height: 18),
+        const Text('Pagos registrados', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+        for (final pg in _pagos)
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.payments, color: kVerde, size: 34),
+              title: Text(fmtPlata(pg['monto'] as num?),
+                  style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w900, color: kVerde)),
+              subtitle: Text('${fmtFecha(pg['fecha']?.toString())} · ${pg['medio'] ?? ''} · ${pg['concepto'] ?? ''}'),
+              trailing: IconButton(
+                icon: const Icon(Icons.undo),
+                tooltip: 'Deshacer pago',
+                onPressed: () async {
+                  if (!await confirmar(context, 'Se anula este pago y vuelve a sumarse a la deuda.',
+                      boton: 'Deshacer pago')) {
+                    return;
+                  }
+                  await Expensas.anularPago(pg);
+                  await _recargarCuenta();
+                },
+              ),
+            ),
+          ),
+      ],
       const SizedBox(height: 18),
       const Text('Expensas de esta unidad', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
       if (_exp.isEmpty)

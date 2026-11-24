@@ -129,33 +129,29 @@ pw.Widget pdfInfoCard(String titulo, List<List<String>> pares, PdfColor color) {
   return pw.Expanded(
     child: pw.Container(
       margin: const pw.EdgeInsets.symmetric(horizontal: 4),
-      color: cGris,
-      child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-        pw.Container(width: 4, color: color),
-        pw.Expanded(
-          child: pw.Padding(
-            padding: const pw.EdgeInsets.all(10),
-            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text(limpio(titulo).toUpperCase(),
-                  style: pw.TextStyle(color: color, fontSize: 9, fontWeight: pw.FontWeight.bold)),
-              pw.SizedBox(height: 5),
-              for (final par in pares)
-                pw.Padding(
-                  padding: const pw.EdgeInsets.only(bottom: 2),
-                  child: pw.RichText(
-                    text: pw.TextSpan(children: [
-                      pw.TextSpan(
-                          text: '${limpio(par[0])}: ',
-                          style: const pw.TextStyle(color: cTenue, fontSize: 9)),
-                      pw.TextSpan(
-                          text: limpio(par[1]),
-                          style: pw.TextStyle(color: cTexto, fontSize: 9.5, fontWeight: pw.FontWeight.bold)),
-                    ]),
-                  ),
-                ),
-            ]),
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        color: cGris,
+        border: pw.Border(left: pw.BorderSide(color: color, width: 4)),
+      ),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(limpio(titulo).toUpperCase(),
+            style: pw.TextStyle(color: color, fontSize: 9, fontWeight: pw.FontWeight.bold)),
+        pw.SizedBox(height: 5),
+        for (final par in pares)
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 2),
+            child: pw.RichText(
+              text: pw.TextSpan(children: [
+                pw.TextSpan(
+                    text: '${limpio(par[0])}: ',
+                    style: const pw.TextStyle(color: cTenue, fontSize: 9)),
+                pw.TextSpan(
+                    text: limpio(par[1]),
+                    style: pw.TextStyle(color: cTexto, fontSize: 9.5, fontWeight: pw.FontWeight.bold)),
+              ]),
+            ),
           ),
-        ),
       ]),
     ),
   );

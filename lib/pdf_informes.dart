@@ -125,8 +125,9 @@ Future<File> pdfExpensaUnidad(
 Future<File> pdfEstadoCuenta(
   Map<String, dynamic> unidad,
   Map<String, dynamic>? cons,
-  List<Map<String, dynamic>> expensas,
-) async {
+  List<Map<String, dynamic>> expensas, [
+  List<Map<String, dynamic>> pagos = const [],
+]) async {
   final logo = await cargarLogo();
   final saldo = _n(unidad['saldo']);
   final debe = saldo > 0.005;
@@ -134,6 +135,9 @@ Future<File> pdfEstadoCuenta(
   for (final x in expensas) {
     emitido += _n(x['total']);
     if (x['estado'] == 'Pagado') cobrado += _n(x['total']);
+  }
+  for (final pg in pagos) {
+    cobrado += _n(pg['monto']);
   }
   final nombreUnidad = 'Piso ${unidad['piso'] ?? ''} - Unidad ${unidad['numero'] ?? ''}';
   final doc = pw.Document(title: 'Estado de cuenta', author: 'Consorcio Field');
@@ -220,6 +224,24 @@ Future<File> pdfEstadoCuenta(
             pw.TextAlign.left
           ],
         ),
+      if (pagos.isNotEmpty) ...[
+        pdfSeccion('Pagos registrados', color: cVerde),
+        pdfTabla(
+          ['Fecha', 'Concepto', 'Forma de pago', 'Monto'],
+          [
+            for (final pg in pagos)
+              [
+                pdfCelda(fmtFecha(pg['fecha']?.toString())),
+                pdfCelda('${pg['concepto'] ?? ''}', bold: true),
+                pdfCelda('${pg['medio'] ?? ''}'),
+                pdfCelda(_plata(pg['monto']), align: pw.TextAlign.right, bold: true),
+              ]
+          ],
+          [2, 3, 3, 2.4],
+          color: cVerde,
+          alin: [pw.TextAlign.left, pw.TextAlign.left, pw.TextAlign.left, pw.TextAlign.right],
+        ),
+      ],
       pw.SizedBox(height: 12),
       pw.Text('Documento generado el ${fmtFecha(DateTime.now().toIso8601String(), hora: true)}.',
           style: const pw.TextStyle(fontSize: 8.5, color: cTenue)),
