@@ -70,3 +70,4 @@ Todo se guarda en el celular (`consorcio_field.db`), cada módulo en tablas sepa
 - **Firma del administrador/a:** en el consorcio, botón ESCANEAR FIRMA CON LA CÁMARA. Se agrega al final de todos los PDF.
 - **Ingresos** y **Informe de gastos e ingresos (PDF)** con balance, desde la pantalla principal, Gastos o Ingresos.
 - Los PDF ya no llevan el nombre del desarrollador; figura al pie de la pantalla principal.
+- **Movimiento de fondos:** cuadro mensual por consorcio (Concepto / Entrada-Debe / Salida-Haber / Saldo) con saldo inicial (resultado del mes anterior), expensas comunes cobradas, fondo de reserva (10 %), deudas y convenios (atrasadas pagadas), otros ingresos y los gastos del mes. Genera el resultado del mes y PDF.

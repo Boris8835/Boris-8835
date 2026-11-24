@@ -4,6 +4,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'compartir_app.dart';
 import 'screens/consorcios.dart';
 import 'screens/consulta.dart';
+import 'screens/fondos.dart';
 import 'screens/gastos.dart';
 import 'screens/informe_financiero.dart';
 import 'screens/ingresos.dart';
@@ -83,6 +84,7 @@ class Inicio extends StatelessWidget {
       _Modulo('Órdenes de trabajo', Icons.build, const Color(0xFF6A1B9A), () => const OrdenesScreen()),
       _Modulo('Gastos', Icons.receipt_long, kVerde, () => const GastosScreen()),
       _Modulo('Ingresos', Icons.savings, const Color(0xFF2E7D32), () => const IngresosScreen()),
+      _Modulo('Movimiento de fondos', Icons.account_balance, const Color(0xFF4E342E), () => const FondosScreen()),
       _Modulo('Informe gastos e ingresos', Icons.picture_as_pdf, const Color(0xFF00838F), () => const InformeFinancieroScreen()),
       _Modulo('Liquidación de expensas', Icons.calculate, const Color(0xFF283593), () => const LiquidacionScreen()),
       _Modulo('Reclamos vecinales', Icons.record_voice_over, kRojo, () => const ReclamosScreen()),
