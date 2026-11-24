@@ -63,10 +63,8 @@ class _LiquidacionScreenState extends State<LiquidacionScreen> {
   double _ord(Map<String, dynamic> u) => double.parse((_totalOrd * _coef(u) / 100).toStringAsFixed(2));
   double _ext(Map<String, dynamic> u) => double.parse((_totalExt * _coef(u) / 100).toStringAsFixed(2));
 
-  double get _cobrado =>
-      _expensas.where((e) => e['estado'] == 'Pagado').fold(0.0, (a, e) => a + ((e['total'] as num?)?.toDouble() ?? 0));
-  double get _pendiente =>
-      _expensas.where((e) => e['estado'] != 'Pagado').fold(0.0, (a, e) => a + ((e['total'] as num?)?.toDouble() ?? 0));
+  double get _cobrado => _expensas.fold(0.0, (a, e) => a + ((e['pagado'] as num?)?.toDouble() ?? 0));
+  double get _pendiente => _expensas.fold(0.0, (a, e) => a + restaDe(e));
 
   void _cambiarMes(int d) {
     setState(() => _mes = DateTime(_mes.year, _mes.month + d));

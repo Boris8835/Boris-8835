@@ -80,7 +80,7 @@ class _SaldosState extends State<_Saldos> {
         if (lista.isEmpty)
           const Padding(
               padding: EdgeInsets.all(20),
-              child: Text('Sin unidades para mostrar.\nLos saldos se editan en cada unidad (módulo Consorcios).',
+              child: Text('Sin unidades para mostrar.\nLos saldos se calculan solos con las expensas y pagos de cada unidad.',
                   textAlign: TextAlign.center, style: TextStyle(fontSize: 17))),
         for (final u in lista)
           Card(

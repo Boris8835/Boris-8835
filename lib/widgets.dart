@@ -157,6 +157,7 @@ class ListaModulo extends StatefulWidget {
   final String vacio;
   final String Function(Map<String, dynamic>)? buscable;
   final Widget? arriba;
+  final List<Widget> acciones;
   const ListaModulo({
     super.key,
     required this.titulo,
@@ -166,6 +167,7 @@ class ListaModulo extends StatefulWidget {
     required this.vacio,
     this.buscable,
     this.arriba,
+    this.acciones = const [],
   });
 
   @override
@@ -199,7 +201,7 @@ class ListaModuloState extends State<ListaModulo> {
         ? _datos
         : _datos.where((e) => widget.buscable!(e).toLowerCase().contains(f)).toList();
     return Scaffold(
-      appBar: AppBar(title: Text(widget.titulo)),
+      appBar: AppBar(title: Text(widget.titulo), actions: widget.acciones),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: kNaranja,

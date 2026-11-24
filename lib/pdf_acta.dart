@@ -102,14 +102,7 @@ Future<File> generarActaPdf(Map<String, dynamic> insp, Map<String, dynamic>? con
     cuerpo.add(pdfSeccion('Observaciones generales', color: cNaranja));
     cuerpo.add(pw.Text(limpio(insp['notas']), style: const pw.TextStyle(fontSize: 10)));
   }
-  cuerpo.add(pw.SizedBox(height: 40));
-  cuerpo.add(pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
-    pw.Column(children: [
-      pw.Container(width: 200, height: 0.8, color: cTexto),
-      pw.SizedBox(height: 3),
-      pw.Text('Firma del administrador', style: const pw.TextStyle(fontSize: 9, color: cTenue)),
-    ]),
-  ]));
+  cuerpo.add(pdfBloqueFirma(consorcio, await cargarFirma(consorcio)));
 
   final doc = pw.Document(title: 'Acta de inspección', author: 'Consorcio Field');
   doc.addPage(pw.MultiPage(

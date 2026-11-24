@@ -10,7 +10,7 @@ import 'widgets.dart';
 // en texto: solo su huella con sal y 60.000 repeticiones.)
 // =====================================================================
 const String kDesarrollador = 'Boris Javier Casanueva Muñoz';
-const String kVersionApp = '1.2';
+const String kVersionApp = '1.3';
 const String kLinkDescarga = 'https://github.com/Boris8835/Boris-8835/releases/latest';
 
 const String _sal = 'c6c25a4e9f3884dc';
@@ -77,7 +77,7 @@ void mostrarAcercaDe(BuildContext context) {
     context: context,
     builder: (d) => AlertDialog(
       title: const Text('Consorcio Field'),
-      content: Text('Versión $kVersionApp\n\nDesarrollada por\n$kDesarrollador\n\nAdministración de consorcios en terreno, 100 % sin internet.',
+      content: Text('Versión $kVersionApp\n\nDesarrollada por\n$kDesarrollador\nTel. 385 5981413\n\nAdministración de consorcios en terreno, 100 % sin internet.',
           style: const TextStyle(fontSize: 17)),
       actions: [TextButton(onPressed: () => Navigator.pop(d), child: const Text('Cerrar'))],
     ),

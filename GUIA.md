@@ -62,3 +62,11 @@ Todo se guarda en el celular (`consorcio_field.db`), cada módulo en tablas sepa
 - **Dictado por voz:** usa el reconocimiento de Google del celular. Sin internet funciona solo si tenés descargado el paquete de voz en español (*Ajustes → Idioma → Voz*).
 - **Saldos de expensas:** se cargan a mano en cada unidad (campo "Saldo pendiente").
 - **Firma del APK:** el APK sale firmado con clave de depuración. Sirve para instalar en tu teléfono; para publicar en Play Store habría que firmarlo con tu propia clave.
+
+## 8. Novedades de la versión 1.3
+- **Pagos parciales:** en cada expensa, el botón PAGAR permite poner un monto menor. Queda en PAGO PARCIAL y lo que resta se arrastra y se suma al saldo pendiente.
+- **Saldo pendiente:** se calcula solo (suma de lo que resta de cada expensa). Cada propietario debe lo que le corresponde según su porcentaje (coeficiente). Para una deuda vieja, usá CARGAR SALDO ANTERIOR en la unidad.
+- **Resumen de cuenta:** en la unidad se ve total emitido, pagos recibidos, pagos parciales anteriores y saldo pendiente. Los PDF muestran lo mismo.
+- **Firma del administrador/a:** en el consorcio, botón ESCANEAR FIRMA CON LA CÁMARA. Se agrega al final de todos los PDF.
+- **Ingresos** y **Informe de gastos e ingresos (PDF)** con balance, desde la pantalla principal, Gastos o Ingresos.
+- Los PDF ya no llevan el nombre del desarrollador; figura al pie de la pantalla principal.

@@ -4,6 +4,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 import 'package:image_picker/image_picker.dart';
 import '../db.dart';
 import '../widgets.dart';
+import 'informe_financiero.dart';
 
 // =====================================================================
 // MÓDULO 4: Carga rápida de gastos (con OCR offline de la factura)
@@ -21,6 +22,14 @@ class GastosScreen extends StatelessWidget {
       vacio: 'No hay gastos cargados.\nTocá NUEVO y sacale una foto a la factura.',
       cargar: () => Db.all('gastos'),
       buscable: (e) => '${e['consorcio_nombre']} ${e['concepto']} ${e['proveedor']}',
+      acciones: [
+        IconButton(
+          tooltip: 'PDF de gastos e ingresos',
+          icon: const Icon(Icons.picture_as_pdf),
+          onPressed: () => Navigator.push(
+              context, MaterialPageRoute(builder: (_) => const InformeFinancieroScreen())),
+        ),
+      ],
       onNuevo: () async {
         await Navigator.push(context, MaterialPageRoute(builder: (_) => const GastoForm()));
       },

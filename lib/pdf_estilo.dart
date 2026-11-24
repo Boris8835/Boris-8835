@@ -203,9 +203,43 @@ pw.Widget pdfPie(pw.Context c) {
     padding: const pw.EdgeInsets.only(top: 6),
     decoration: pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: PdfColors.grey400, width: 0.5))),
     child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-      pw.Text('Consorcio Field - desarrollado por Boris Javier Casanueva Muñoz',
-          style: const pw.TextStyle(fontSize: 8, color: cTenue)),
+      pw.Text('Consorcio Field', style: const pw.TextStyle(fontSize: 8, color: cTenue)),
       pw.Text('Pág. ${c.pageNumber} de ${c.pagesCount}', style: const pw.TextStyle(fontSize: 8, color: cTenue)),
+    ]),
+  );
+}
+
+/// Carga la imagen de la firma del administrador (si el consorcio tiene una).
+Future<pw.MemoryImage?> cargarFirma(Map<String, dynamic>? cons) async {
+  try {
+    final ruta = (cons?['firma'] ?? '').toString();
+    if (ruta.isEmpty) return null;
+    final f = File(ruta);
+    if (!await f.exists()) return null;
+    return pw.MemoryImage(await f.readAsBytes());
+  } catch (_) {
+    return null;
+  }
+}
+
+/// Bloque de firma del administrador al final del informe.
+pw.Widget pdfBloqueFirma(Map<String, dynamic>? cons, pw.MemoryImage? firma) {
+  final nombre = limpio(cons?['admin_nombre'] ?? '');
+  return pw.Container(
+    margin: const pw.EdgeInsets.only(top: 26),
+    child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.end, children: [
+      pw.Column(children: [
+        if (firma != null)
+          pw.Container(height: 54, width: 170, child: pw.Image(firma, fit: pw.BoxFit.contain))
+        else
+          pw.SizedBox(height: 40),
+        pw.Container(width: 200, height: 0.8, color: cTexto),
+        pw.SizedBox(height: 3),
+        pw.Text(nombre.isEmpty ? 'Administrador/a' : nombre,
+            style: pw.TextStyle(fontSize: 9.5, fontWeight: pw.FontWeight.bold, color: cNavy)),
+        pw.Text(nombre.isEmpty ? 'Firma' : 'Administrador/a - Firma',
+            style: const pw.TextStyle(fontSize: 8.5, color: cTenue)),
+      ]),
     ]),
   );
 }

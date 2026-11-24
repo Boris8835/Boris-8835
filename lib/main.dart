@@ -5,6 +5,8 @@ import 'compartir_app.dart';
 import 'screens/consorcios.dart';
 import 'screens/consulta.dart';
 import 'screens/gastos.dart';
+import 'screens/informe_financiero.dart';
+import 'screens/ingresos.dart';
 import 'screens/inspecciones.dart';
 import 'screens/liquidacion.dart';
 import 'screens/ordenes.dart';
@@ -80,6 +82,8 @@ class Inicio extends StatelessWidget {
       _Modulo('Inspecciones', Icons.fact_check, const Color(0xFF1565C0), () => const InspeccionesScreen()),
       _Modulo('Órdenes de trabajo', Icons.build, const Color(0xFF6A1B9A), () => const OrdenesScreen()),
       _Modulo('Gastos', Icons.receipt_long, kVerde, () => const GastosScreen()),
+      _Modulo('Ingresos', Icons.savings, const Color(0xFF2E7D32), () => const IngresosScreen()),
+      _Modulo('Informe gastos e ingresos', Icons.picture_as_pdf, const Color(0xFF00838F), () => const InformeFinancieroScreen()),
       _Modulo('Liquidación de expensas', Icons.calculate, const Color(0xFF283593), () => const LiquidacionScreen()),
       _Modulo('Reclamos vecinales', Icons.record_voice_over, kRojo, () => const ReclamosScreen()),
       _Modulo('Consulta rápida', Icons.search, kAmbar, () => const ConsultaScreen()),
@@ -102,6 +106,18 @@ class Inicio extends StatelessWidget {
               icon: const Icon(Icons.info_outline),
               onPressed: () => mostrarAcercaDe(context)),
         ],
+      ),
+      bottomNavigationBar: Container(
+        color: kAzul,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        child: const SafeArea(
+          top: false,
+          child: Text(
+            'Desarrollado por Boris Javier Casanueva Muñoz  ·  Tel. 385 5981413',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+        ),
       ),
       body: SafeArea(
         child: GridView.count(

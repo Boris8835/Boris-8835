@@ -14,7 +14,7 @@ class Db {
   static const String _tablaPagos = '''CREATE TABLE pagos(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     unidad_id INTEGER NOT NULL, consorcio_id INTEGER,
-    fecha TEXT, monto REAL, medio TEXT, concepto TEXT)''';
+    fecha TEXT, monto REAL, medio TEXT, concepto TEXT, expensa_id INTEGER)''';
 
   static const String _tablaExpensas = '''CREATE TABLE expensas(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -22,7 +22,70 @@ class Db {
     unidad_id INTEGER, unidad_txt TEXT, propietario TEXT,
     periodo TEXT NOT NULL, coeficiente REAL,
     ordinarias REAL, extraordinarias REAL, total REAL,
-    estado TEXT, fecha_emision TEXT, fecha_pago TEXT, medio_pago TEXT)''';
+    estado TEXT, fecha_emision TEXT, fecha_pago TEXT, medio_pago TEXT,
+    tipo TEXT DEFAULT 'Expensa', concepto TEXT, pagado REAL DEFAULT 0)''';
+
+  static const String _tablaIngresos = '''CREATE TABLE IF NOT EXISTS ingresos(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    consorcio_id INTEGER, consorcio_nombre TEXT, fecha TEXT,
+    concepto TEXT, tipo TEXT, monto REAL, notas TEXT)''';
+
+  static Future<void> _intentar(Database db, String sql) async {
+    try {
+      await db.execute(sql);
+    } catch (_) {
+      // la columna ya existe: no pasa nada
+    }
+  }
+
+  /// v5: pagos parciales, saldos anteriores, firma e ingresos. No pierde datos.
+  static Future<void> _migrar5(Database db) async {
+    await _intentar(db, "ALTER TABLE expensas ADD COLUMN tipo TEXT DEFAULT 'Expensa'");
+    await _intentar(db, 'ALTER TABLE expensas ADD COLUMN concepto TEXT');
+    await _intentar(db, 'ALTER TABLE expensas ADD COLUMN pagado REAL DEFAULT 0');
+    await _intentar(db, 'ALTER TABLE pagos ADD COLUMN expensa_id INTEGER');
+    await _intentar(db, 'ALTER TABLE consorcios ADD COLUMN firma TEXT');
+    await db.execute(_tablaIngresos);
+    await db.execute("UPDATE expensas SET tipo = 'Expensa' WHERE tipo IS NULL");
+    await db.execute("UPDATE expensas SET pagado = total WHERE estado = 'Pagado'");
+    await db.execute('UPDATE expensas SET pagado = 0 WHERE pagado IS NULL');
+
+    // El saldo que no tenía detalle (cargado a mano o con la versión anterior)
+    // pasa a ser un "Saldo anterior" por unidad, para poder cobrarlo en partes.
+    final ahora = DateTime.now();
+    final periodo = '${ahora.year}-${ahora.month.toString().padLeft(2, '0')}';
+    final unidades = await db.query('unidades');
+    for (final u in unidades) {
+      final saldo = (u['saldo'] as num?)?.toDouble() ?? 0;
+      final filas = await db.query('expensas', where: 'unidad_id = ?', whereArgs: [u['id']]);
+      double enFilas = 0;
+      for (final f in filas) {
+        final resta = ((f['total'] as num?)?.toDouble() ?? 0) - ((f['pagado'] as num?)?.toDouble() ?? 0);
+        if (resta > 0) enFilas += resta;
+      }
+      final resto = saldo - enFilas;
+      if (resto > 0.005) {
+        final cons = await db.query('consorcios', where: 'id = ?', whereArgs: [u['consorcio_id']]);
+        await db.insert('expensas', {
+          'consorcio_id': u['consorcio_id'],
+          'consorcio_nombre': cons.isEmpty ? '' : cons.first['nombre'],
+          'unidad_id': u['id'],
+          'unidad_txt': 'Piso ${u['piso']} - ${u['numero']}',
+          'propietario': u['propietario'] ?? '',
+          'periodo': periodo,
+          'coeficiente': u['coeficiente'],
+          'ordinarias': 0.0,
+          'extraordinarias': 0.0,
+          'total': double.parse(resto.toStringAsFixed(2)),
+          'estado': 'Debe',
+          'fecha_emision': ahora.toIso8601String(),
+          'tipo': 'Saldo anterior',
+          'concepto': 'Saldo anterior',
+          'pagado': 0.0,
+        });
+      }
+    }
+  }
 
   static const String _tablaLiquidaciones = '''CREATE TABLE liquidaciones(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,7 +97,7 @@ class Db {
     final dir = await getDatabasesPath();
     _db = await openDatabase(
       p.join(dir, 'consorcio_field.db'),
-      version: 4,
+      version: 5,
       onUpgrade: (db, viejo, nuevo) async {
         if (viejo < 2) {
           await db.execute(_tablaLiquidaciones);
@@ -45,13 +108,16 @@ class Db {
         if (viejo < 4) {
           await db.execute(_tablaPagos);
         }
+        if (viejo < 5) {
+          await _migrar5(db);
+        }
       },
       onCreate: (db, v) async {
         await db.execute('''CREATE TABLE consorcios(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           nombre TEXT NOT NULL, cuit TEXT, direccion TEXT,
           admin_nombre TEXT, admin_tel TEXT, admin_email TEXT, notas TEXT,
-          creado TEXT)''');
+          creado TEXT, firma TEXT)''');
         await db.execute('''CREATE TABLE unidades(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           consorcio_id INTEGER NOT NULL, piso TEXT, numero TEXT,
@@ -84,6 +150,7 @@ class Db {
         await db.execute(_tablaLiquidaciones);
         await db.execute(_tablaExpensas);
         await db.execute(_tablaPagos);
+        await db.execute(_tablaIngresos);
         await db.execute('''CREATE TABLE reclamo_historial(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           reclamo_id INTEGER NOT NULL, fecha TEXT, texto TEXT, foto TEXT)''');

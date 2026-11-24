@@ -1,8 +1,10 @@
 import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:open_filex/open_filex.dart';
 import '../db.dart';
 import '../expensas.dart';
+import '../firma.dart';
 import '../widgets.dart';
 
 // =====================================================================
@@ -58,6 +60,24 @@ class _ConsorcioFormState extends State<ConsorcioForm> {
   late final _tel = TextEditingController(text: widget.existente?['admin_tel']);
   late final _mail = TextEditingController(text: widget.existente?['admin_email']);
   late final _notas = TextEditingController(text: widget.existente?['notas']);
+  late String _firma = (widget.existente?['firma'] ?? '').toString();
+  bool _procesando = false;
+
+  Future<void> _escanearFirma() async {
+    setState(() => _procesando = true);
+    try {
+      final r = await escanearFirma();
+      if (r != null) {
+        setState(() => _firma = r);
+      } else if (mounted) {
+        aviso(context, 'No se detectó la firma. Firmá con birome oscura sobre hoja blanca y con buena luz.');
+      }
+    } catch (e) {
+      if (mounted) aviso(context, 'No se pudo escanear la firma: $e');
+    } finally {
+      if (mounted) setState(() => _procesando = false);
+    }
+  }
 
   Future<void> _guardar() async {
     if (!_k.currentState!.validate()) return;
@@ -70,6 +90,7 @@ class _ConsorcioFormState extends State<ConsorcioForm> {
       'admin_tel': _tel.text.trim(),
       'admin_email': _mail.text.trim(),
       'notas': _notas.text.trim(),
+      'firma': _firma,
       'creado': widget.existente?['creado'] ?? DateTime.now().toIso8601String(),
     };
     await Db.save('consorcios', v);
@@ -94,6 +115,44 @@ class _ConsorcioFormState extends State<ConsorcioForm> {
           campo(_adm, 'Nombre y apellido / razón social', icono: Icons.person),
           campo(_tel, 'Teléfono', tipo: TextInputType.phone, icono: Icons.phone),
           campo(_mail, 'Correo electrónico', tipo: TextInputType.emailAddress, icono: Icons.email),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: kAzul, width: 2)),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Firma del administrador/a',
+                  style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
+              const SizedBox(height: 4),
+              const Text('Se agrega al final de todos los PDF. Firmá con birome oscura en una hoja blanca, con buena luz, y sacale una foto.',
+                  style: TextStyle(fontSize: 15)),
+              const SizedBox(height: 10),
+              if (_firma.isNotEmpty && File(_firma).existsSync())
+                Container(
+                  height: 110,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                      color: Colors.white, border: Border.all(color: Colors.black26), borderRadius: BorderRadius.circular(10)),
+                  child: Image.file(File(_firma), fit: BoxFit.contain),
+                ),
+              const SizedBox(height: 8),
+              if (_procesando)
+                const Center(child: CircularProgressIndicator())
+              else ...[
+                BotonGrande(
+                    icono: Icons.photo_camera,
+                    texto: _firma.isEmpty ? 'ESCANEAR FIRMA CON LA CÁMARA' : 'ESCANEAR DE NUEVO',
+                    color: kNaranja,
+                    onPressed: _escanearFirma),
+                if (_firma.isNotEmpty)
+                  TextButton.icon(
+                      onPressed: () => setState(() => _firma = ''),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Quitar firma')),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 10),
           campo(_notas, 'Notas', lineas: 3),
           BotonGrande(icono: Icons.save, texto: 'GUARDAR', onPressed: _guardar),
         ]),
@@ -370,8 +429,7 @@ class _UnidadFormState extends State<UnidadForm> {
   late final _tel = TextEditingController(text: widget.existente?['telefono']);
   late final _coef = TextEditingController(
       text: widget.existente == null ? '' : widget.existente!['coeficiente'].toString());
-  late final _saldo = TextEditingController(
-      text: widget.existente == null ? '0' : widget.existente!['saldo'].toString());
+  double _saldo = 0;
 
   List<Map<String, dynamic>> _exp = [];
   List<Map<String, dynamic>> _pagos = [];
@@ -394,14 +452,29 @@ class _UnidadFormState extends State<UnidadForm> {
       _exp = e;
       _pagos = p;
       _unidadDb = u;
-      if (u != null) _saldo.text = u['saldo'].toString();
+      _saldo = e.fold<double>(0, (a, x) => a + restaDe(x));
     });
   }
 
+  double _num2(dynamic v) => (v as num?)?.toDouble() ?? 0;
+
+  Widget _fila(String t, String v, {Color? color, bool grande = false}) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(children: [
+          Expanded(child: Text(t, style: TextStyle(fontSize: grande ? 18 : 16, fontWeight: grande ? FontWeight.w900 : FontWeight.w600))),
+          Text(v, style: TextStyle(fontSize: grande ? 22 : 17, fontWeight: FontWeight.w900, color: color)),
+        ]),
+      );
+
   List<Widget> _seccionCuenta() {
-    final saldo = parseNumero(_saldo.text) ?? 0;
+    final saldo = _saldo;
     final debe = saldo > 0.005;
-    final sinDetalle = _unidadDb == null ? 0.0 : Expensas.saldoSinDetalle(_unidadDb!, _exp);
+    final totalEmitido = _exp.fold<double>(0, (a, x) => a + _num2(x['total']));
+    final totalPagado = _exp.fold<double>(0, (a, x) => a + _num2(x['pagado']));
+    // Pagos parciales ya hechos sobre deudas que todavía no se cancelaron
+    final parcialesPrevios = _exp
+        .where((x) => restaDe(x) > 0 && _num2(x['pagado']) > 0.005)
+        .fold<double>(0, (a, x) => a + _num2(x['pagado']));
     return [
       const SizedBox(height: 18),
       Card(
@@ -422,30 +495,35 @@ class _UnidadFormState extends State<UnidadForm> {
           ]),
         ),
       ),
-      if (sinDetalle > 0.005)
-        Card(
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14), side: const BorderSide(color: kAmbar, width: 2.5)),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Saldo anterior sin detalle: ${fmtPlata(sinDetalle)}',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 4),
-              const Text('Deuda cargada antes de emitir las expensas por mes. Registrá acá su pago.',
-                  style: TextStyle(fontSize: 15)),
-              const SizedBox(height: 10),
-              BotonGrande(
-                  icono: Icons.check_circle,
-                  texto: 'PAGADO / REGISTRAR PAGO',
-                  color: kVerde,
-                  onPressed: () async {
-                    if (_unidadDb == null) return;
-                    if (await dialogoPagoSaldo(context, _unidadDb!, sinDetalle)) await _recargarCuenta();
-                  }),
-            ]),
-          ),
+      Card(
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14), side: const BorderSide(color: kAzul, width: 2)),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('Resumen de la cuenta', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            _fila('Total emitido / adeudado', fmtPlata(totalEmitido)),
+            _fila('Pagos recibidos', fmtPlata(totalPagado), color: kVerde),
+            if (parcialesPrevios > 0.005)
+              _fila('Pagos parciales anteriores (deuda abierta)', fmtPlata(parcialesPrevios), color: kAmbar),
+            const Divider(),
+            _fila('SALDO PENDIENTE', fmtPlata(saldo), color: debe ? kRojo : kVerde, grande: true),
+            const SizedBox(height: 4),
+            const Text('Lo que resta de cada expensa se arrastra y se suma al saldo pendiente.',
+                style: TextStyle(fontSize: 14)),
+          ]),
         ),
+      ),
+      const SizedBox(height: 8),
+      BotonGrande(
+          icono: Icons.add_card,
+          texto: 'CARGAR SALDO ANTERIOR',
+          color: kAmbar,
+          onPressed: () async {
+            if (_unidadDb == null) return;
+            if (await dialogoSaldoAnterior(context, _unidadDb!)) await _recargarCuenta();
+          }),
       const SizedBox(height: 10),
       BotonGrande(
           icono: Icons.picture_as_pdf,
@@ -499,7 +577,6 @@ class _UnidadFormState extends State<UnidadForm> {
       'propietario': _prop.text.trim(),
       'telefono': _tel.text.trim(),
       'coeficiente': parseNumero(_coef.text) ?? 0.0,
-      'saldo': parseNumero(_saldo.text) ?? 0.0,
     });
     if (mounted) Navigator.pop(context);
   }
@@ -527,7 +604,6 @@ class _UnidadFormState extends State<UnidadForm> {
           campo(_prop, 'Propietario / inquilino (nombre y apellido)', icono: Icons.person),
           campo(_tel, 'Teléfono', tipo: TextInputType.phone, icono: Icons.phone),
           campo(_coef, 'Coeficiente de expensas (%)', tipo: const TextInputType.numberWithOptions(decimal: true)),
-          campo(_saldo, 'Saldo pendiente de expensas (\$)', tipo: const TextInputType.numberWithOptions(decimal: true)),
           BotonGrande(icono: Icons.save, texto: 'GUARDAR', onPressed: _guardar),
           if (widget.existente != null) ..._seccionCuenta(),
         ]),
